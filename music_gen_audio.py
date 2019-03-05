@@ -13,7 +13,7 @@ def prepare_sequences(notes, pitchnames, n_vocab):
     """ Prepare the sequences used by the Neural Network """
     # map between notes and integers and back
     note_to_int = dict((note, number) for number, note in enumerate(pitchnames))
-
+    print("Max note int:", max(note_to_int.values()))
     sequence_length = 100
     network_input = []
     output = []
@@ -30,7 +30,7 @@ def prepare_sequences(notes, pitchnames, n_vocab):
     # normalize input
     normalized_input = normalized_input / float(n_vocab)
 
-    return (network_input, normalized_input)
+    return (network_input, normalized_input, note_to_int)
 
 def create_network(network_input, n_vocab):
     """ create the structure of the neural network """
@@ -77,6 +77,7 @@ def generate_notes(model, init_input, pitchnames, n_vocab):
 
         pattern.append(index)
         pattern = pattern[1:len(pattern)]
+        # print(pattern)
 
     return prediction_output
 
@@ -124,15 +125,16 @@ def retrieve_notes_trained_data():
     # Get all pitch names
     n_vocab = len(set(notes))
 
-    network_input, normalized_input = prepare_sequences(notes, pitchnames, n_vocab)
+    print("Note len:", len(notes))
+    network_input, normalized_input, note_to_int = prepare_sequences(notes, pitchnames, n_vocab)
     
-    return notes, pitchnames, n_vocab, network_input, normalized_input
+    return notes, pitchnames, n_vocab, network_input, normalized_input, note_to_int
 
-
-if __name__ == '__main__':
-    notes, pitchnames, n_vocab, network_input, normalized_input = retrieve_notes_trained_data()
+def test_gen_midi():
+    notes, pitchnames, n_vocab, network_input, normalized_input, note_to_int = retrieve_notes_trained_data()
     model = create_network(normalized_input, n_vocab)
 
+    print("Nw input len:", len(network_input))
     # input size is 1xlen(network_input)
     # 1 x 58920
     # Example: [311, 299, 313, 297, 299, 280, 299, 318, 313, 320, 143, 21, 45, 116, 49, 354, 277, 354, 277, 262, 277, 354, 277, 354, 277, 262, 277, 354, 277, 354, 277, 262, 277, 354, 277, 354, 277, 262, 277, 357, 354, 354, 320, 317, 342, 345, 354, 354, 333, 317, 342, 320, 354, 354, 4, 145, 320, 354, 354, 317, 342, 357, 311, 311, 345, 354, 290, 293, 311, 311, 314, 354, 290, 293, 311, 311, 229, 241, 357, 311, 311, 354, 290, 357, 354, 354, 320, 317, 342, 345, 354, 354, 333, 317, 342, 320, 354, 354, 4, 145]
@@ -141,9 +143,9 @@ if __name__ == '__main__':
 
     # predict output from this sequence
     prediction_output = generate_notes(model, init_input, pitchnames, n_vocab)
-
+    print("init_input: ", init_input)
+    
+    print(len(prediction_output), list(map(lambda x: note_to_int[x], prediction_output)))
     create_midi(prediction_output)
-
-
 
 

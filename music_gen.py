@@ -1,4 +1,4 @@
-import music_gen_lstm
+import music_gen_audio as mga
 
 
-music_gen_lstm.train_network()
+mga.test_gen_midi()
