@@ -1,5 +1,5 @@
 import pickle
-import numpy
+import numpy as np
 from music21 import instrument, note, stream, chord
 from keras.models import Sequential
 from keras.layers import Dense
@@ -8,6 +8,8 @@ from keras.layers import LSTM
 from keras.layers import Activation
 import IPython.display as ipd
 # from midi2audio import FluidSynth
+
+MODE = "original" #"dnf"
 
 def prepare_sequences(notes, pitchnames, n_vocab):
     """ Prepare the sequences used by the Neural Network """
@@ -26,13 +28,13 @@ def prepare_sequences(notes, pitchnames, n_vocab):
     n_patterns = len(network_input)
 
     # reshape the input into a format compatible with LSTM layers
-    normalized_input = numpy.reshape(network_input, (n_patterns, sequence_length, 1))
+    normalized_input = np.reshape(network_input, (n_patterns, sequence_length, 1))
     # normalize input
     normalized_input = normalized_input / float(n_vocab)
-
+    print("len(network_input[0]): ", len(network_input[0]))
     return (network_input, normalized_input, note_to_int)
 
-def create_network(network_input, n_vocab):
+def create_network_original(network_input, n_vocab):
     """ create the structure of the neural network """
     model = Sequential()
     model.add(LSTM(
@@ -55,10 +57,58 @@ def create_network(network_input, n_vocab):
 
     return model
 
+def create_network(network_input, n_vocab):
+    """ create the structure of the neural network """
+    model = Sequential()
+    model.add(LSTM(
+        256,
+        input_shape=(network_input.shape[1], network_input.shape[2]),
+        return_sequences=True
+    ))
+    model.add(Dropout(0.3))
+    model.add(LSTM(256, return_sequences=True))
+    model.add(Dropout(0.3))
+    model.add(LSTM(256))
+    model.add(Dense(256))
+    model.add(Dropout(0.3))
+    model.add(Dense(n_vocab))
+    model.add(Activation('softmax'))
+    model.compile(loss='categorical_crossentropy', optimizer='rmsprop')
+
+    # Load the weights to each node
+    model.load_weights('trained_w/weights.hdf5')#weights-improvement-107-1.0217-bigger.hdf5')
+
+    return model
+
+
+def create_network_small(network_input, n_vocab):
+    """ create the structure of the neural network """
+    model = Sequential()
+    model.add(LSTM(
+        64,
+        input_shape=(network_input.shape[1], network_input.shape[2]),
+        return_sequences=True
+    ))
+    model.add(Dropout(0.3))
+    model.add(LSTM(64, return_sequences=True))
+    model.add(Dropout(0.3))
+    model.add(LSTM(64))
+    model.add(Dense(64))
+    model.add(Dropout(0.3))
+    model.add(Dense(n_vocab))
+    model.add(Activation('softmax'))
+    model.compile(loss='categorical_crossentropy', optimizer='rmsprop')
+
+    # Load the weights to each node
+    filepath = "trained_w/weight_dnf.hdf5"
+    if MODE == "original":
+        filepath = "trained_w/weights.hdf5"
+    model.load_weights(filepath)#weights-improvement-107-1.0217-bigger.hdf5')
+
+    return model
+
 def generate_notes(model, init_input, pitchnames, n_vocab):
     """ Generate notes from the neural network based on init_input """
-    # pick a random sequence from the input as a starting point for the prediction
-
     int_to_note = dict((number, note) for number, note in enumerate(pitchnames))
 
     pattern = init_input 
@@ -66,12 +116,12 @@ def generate_notes(model, init_input, pitchnames, n_vocab):
 
     # generate 500 notes
     for note_index in range(60):
-        prediction_input = numpy.reshape(pattern, (1, len(pattern), 1))
+        prediction_input = np.reshape(pattern, (1, len(pattern), 1))
         prediction_input = prediction_input / float(n_vocab)
 
         prediction = model.predict(prediction_input, verbose=0)
 
-        index = numpy.argmax(prediction)
+        index = np.argmax(prediction)
         result = int_to_note[index]
         prediction_output.append(result)
 
@@ -117,7 +167,10 @@ def create_midi(prediction_output):
 def retrieve_notes_trained_data():
     """ Retrieve a piano midi file """
     #load the notes used to train the model
-    with open('data/notes', 'rb+') as filepath:
+    filepath = 'data/notes'
+    if MODE == "original": 
+        filepath = 'data/notes_original'
+    with open(filepath, 'rb') as filepath:
         notes = pickle.load(filepath)
 
     # Get all pitch names
@@ -132,19 +185,22 @@ def retrieve_notes_trained_data():
 
 def test_gen_midi():
     notes, pitchnames, n_vocab, network_input, normalized_input, note_to_int = retrieve_notes_trained_data()
-    model = create_network(normalized_input, n_vocab)
-
+    if MODE == "original":
+        model = create_network_original(normalized_input, n_vocab)
+    else:
+        model = create_network_small(normalized_input, n_vocab)
     print("Nw input len:", len(network_input))
-    # input size is 1xlen(network_input)
-    # 1 x 58920
+    # input size is 1xlen(init_input)
+    # 1 x 101
     # Example: [311, 299, 313, 297, 299, 280, 299, 318, 313, 320, 143, 21, 45, 116, 49, 354, 277, 354, 277, 262, 277, 354, 277, 354, 277, 262, 277, 354, 277, 354, 277, 262, 277, 354, 277, 354, 277, 262, 277, 357, 354, 354, 320, 317, 342, 345, 354, 354, 333, 317, 342, 320, 354, 354, 4, 145, 320, 354, 354, 317, 342, 357, 311, 311, 345, 354, 290, 293, 311, 311, 314, 354, 290, 293, 311, 311, 229, 241, 357, 311, 311, 354, 290, 357, 354, 354, 320, 317, 342, 345, 354, 354, 333, 317, 342, 320, 354, 354, 4, 145]
-    rand_index = numpy.random.randint(0, len(network_input)-1)
+    
+    # pick a random sequence from the input as a starting point for the prediction
+    rand_index = np.random.randint(0, len(network_input)-1)
     init_input = network_input[rand_index]
-
+    print("init_input: ",len(init_input),  init_input)
     # predict output from this sequence
     prediction_output = generate_notes(model, init_input, pitchnames, n_vocab)
-    print("init_input: ", init_input)
-    
+
     print(len(prediction_output), list(map(lambda x: note_to_int[x], prediction_output)))
     create_midi(prediction_output)
 
