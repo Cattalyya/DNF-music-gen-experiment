@@ -55,14 +55,13 @@ def create_network(network_input, n_vocab):
 
     return model
 
-def generate_notes(model, network_input, pitchnames, n_vocab):
-    """ Generate notes from the neural network based on a sequence of notes """
+def generate_notes(model, init_input, pitchnames, n_vocab):
+    """ Generate notes from the neural network based on init_input """
     # pick a random sequence from the input as a starting point for the prediction
-    start = numpy.random.randint(0, len(network_input)-1)
 
     int_to_note = dict((number, note) for number, note in enumerate(pitchnames))
 
-    pattern = network_input[start]
+    pattern = init_input 
     prediction_output = []
 
     # generate 500 notes
@@ -114,8 +113,8 @@ def create_midi(prediction_output):
 
     midi_stream.write('midi', fp='test_output.mid') #convert to midi file and save
 
-def generate():
-    """ Generate a piano midi file """
+def retrieve_notes_trained_data():
+    """ Retrieve a piano midi file """
     #load the notes used to train the model
     with open('data/notes', 'rb+') as filepath:
         notes = pickle.load(filepath)
@@ -126,9 +125,25 @@ def generate():
     n_vocab = len(set(notes))
 
     network_input, normalized_input = prepare_sequences(notes, pitchnames, n_vocab)
-    model = create_network(normalized_input, n_vocab)
-    prediction_output = generate_notes(model, network_input, pitchnames, n_vocab)
-    create_midi(prediction_output)
+    
+    return notes, pitchnames, n_vocab, network_input, normalized_input
+
 
 if __name__ == '__main__':
-    generate()
+    notes, pitchnames, n_vocab, network_input, normalized_input = retrieve_notes_trained_data()
+    model = create_network(normalized_input, n_vocab)
+
+    # input size is 1xlen(network_input)
+    # 1 x 58920
+    # Example: [311, 299, 313, 297, 299, 280, 299, 318, 313, 320, 143, 21, 45, 116, 49, 354, 277, 354, 277, 262, 277, 354, 277, 354, 277, 262, 277, 354, 277, 354, 277, 262, 277, 354, 277, 354, 277, 262, 277, 357, 354, 354, 320, 317, 342, 345, 354, 354, 333, 317, 342, 320, 354, 354, 4, 145, 320, 354, 354, 317, 342, 357, 311, 311, 345, 354, 290, 293, 311, 311, 314, 354, 290, 293, 311, 311, 229, 241, 357, 311, 311, 354, 290, 357, 354, 354, 320, 317, 342, 345, 354, 354, 333, 317, 342, 320, 354, 354, 4, 145]
+    rand_index = numpy.random.randint(0, len(network_input)-1)
+    init_input = network_input[rand_index]
+
+    # predict output from this sequence
+    prediction_output = generate_notes(model, init_input, pitchnames, n_vocab)
+
+    create_midi(prediction_output)
+
+
+
+
